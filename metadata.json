@@ -1,0 +1,5 @@
+{
+  "name": "ORCA Command Center",
+  "description": "A high-fidelity, gamified dashboard for AI-augmented developers to manage portfolio apps and track simulated revenue.",
+  "requestFramePermissions": []
+}

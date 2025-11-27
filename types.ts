@@ -12,6 +12,8 @@ export interface PortfolioSettings {
   bio: string;
   logoEmoji: string;
   accentColor: string;
+  stripeCustomerId?: string; // For their subscription to Orca
+  stripeConnectedAccountId?: string; // For them to receive money
   socials?: {
     twitter?: string;
     github?: string;
@@ -22,11 +24,16 @@ export interface PortfolioSettings {
 }
 
 export interface UserProfile {
+  uid: string; // Firebase UID
+  email?: string;
+  emailVerified?: boolean;
+  photoURL?: string;
   username: string;
   isPro: boolean;
   joinedAt: number;
   reputation: number;
   title: string;
+  shippedApps?: number;
 }
 
 export interface CommunityUser {

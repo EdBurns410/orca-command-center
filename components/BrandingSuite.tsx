@@ -1,29 +1,58 @@
 
 import React, { useState } from 'react';
-import { X, User, Palette, Globe, Eye, EyeOff, Save, Tag, Grid, Briefcase, Twitter, Github, Linkedin, Mail } from 'lucide-react';
-import { PortfolioSettings, AppProject, AppCategory } from '../types';
+import { X, User, Palette, Globe, Eye, EyeOff, Save, Tag, Grid, Briefcase, Twitter, Github, Linkedin, Mail, Shield, CheckCircle, Lock, AlertTriangle } from 'lucide-react';
+import { PortfolioSettings, AppProject, AppCategory, UserProfile } from '../types';
+import { AuthService } from '../services/platformServices';
 
 interface BrandingSuiteProps {
   isOpen: boolean;
   onClose: () => void;
   settings: PortfolioSettings;
   apps: AppProject[];
+  user: UserProfile | null;
   onSaveSettings: (newSettings: PortfolioSettings) => void;
   onToggleVisibility: (appId: string) => void;
   onUpdateAppCategory: (appId: string, category: AppCategory) => void;
 }
 
 export const BrandingSuite: React.FC<BrandingSuiteProps> = ({ 
-  isOpen, onClose, settings, apps, onSaveSettings, onToggleVisibility, onUpdateAppCategory
+  isOpen, onClose, settings, apps, user, onSaveSettings, onToggleVisibility, onUpdateAppCategory
 }) => {
   const [form, setForm] = useState<PortfolioSettings>(settings);
-  const [activeTab, setActiveTab] = useState<'identity' | 'portfolio' | 'socials'>('identity');
+  const [activeTab, setActiveTab] = useState<'identity' | 'portfolio' | 'socials' | 'account'>('identity');
+  
+  // Account State
+  const [newPassword, setNewPassword] = useState('');
+  const [msg, setMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
     onSaveSettings(form);
-    onClose();
+    // Note: Account settings are saved immediately via handlers below
+    if (activeTab !== 'account') {
+        onClose();
+    }
+  };
+
+  const handleChangePassword = async () => {
+      if (!newPassword) return;
+      try {
+          await AuthService.updateUserPassword(newPassword);
+          setMsg({ type: 'success', text: 'Password updated successfully.' });
+          setNewPassword('');
+      } catch (e: any) {
+          setMsg({ type: 'error', text: e.message });
+      }
+  };
+
+  const handleVerifyEmail = async () => {
+      try {
+          await AuthService.sendVerificationEmail();
+          setMsg({ type: 'success', text: 'Verification email sent. Check your inbox.' });
+      } catch (e: any) {
+          setMsg({ type: 'error', text: e.message });
+      }
   };
 
   const categories = Object.values(AppCategory);
@@ -91,25 +120,21 @@ export const BrandingSuite: React.FC<BrandingSuiteProps> = ({
                             <Briefcase size={20} className="text-cyan-400" />
                             Command Center
                         </h2>
-                        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
-                            <button 
-                                onClick={() => setActiveTab('identity')}
-                                className={`px-4 py-1.5 rounded text-xs font-bold transition-colors ${activeTab === 'identity' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                            >
-                                Identity
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('socials')}
-                                className={`px-4 py-1.5 rounded text-xs font-bold transition-colors ${activeTab === 'socials' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                            >
-                                Socials
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('portfolio')}
-                                className={`px-4 py-1.5 rounded text-xs font-bold transition-colors ${activeTab === 'portfolio' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                            >
-                                Portfolio
-                            </button>
+                        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800 overflow-x-auto">
+                            {[
+                                { id: 'identity', label: 'Identity' },
+                                { id: 'socials', label: 'Socials' },
+                                { id: 'portfolio', label: 'Portfolio' },
+                                { id: 'account', label: 'Account' }
+                            ].map(tab => (
+                                <button 
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`px-4 py-1.5 rounded text-xs font-bold transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
                     <button onClick={onClose} className="text-slate-500 hover:text-white"><X size={20} /></button>
@@ -279,18 +304,85 @@ export const BrandingSuite: React.FC<BrandingSuiteProps> = ({
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'account' && (
+                        <div className="space-y-8 animate-in fade-in duration-300">
+                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-800 pb-2">
+                                <Shield size={16} /> Account Security
+                            </h3>
+
+                            {msg && (
+                                <div className={`p-3 rounded-lg text-sm border ${msg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                                    {msg.text}
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Email Status */}
+                                <div className="space-y-4">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Email Verification</label>
+                                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <Mail size={20} className="text-slate-400" />
+                                            <div className="flex-1">
+                                                <div className="text-sm text-white font-bold">{user?.email || 'No Email'}</div>
+                                                <div className="text-xs text-slate-500">
+                                                    {user?.emailVerified ? 'Verified Account' : 'Unverified Account'}
+                                                </div>
+                                            </div>
+                                            {user?.emailVerified ? <CheckCircle size={20} className="text-green-500" /> : <AlertTriangle size={20} className="text-yellow-500" />}
+                                        </div>
+                                        
+                                        {!user?.emailVerified && user?.email && (
+                                            <button 
+                                                onClick={handleVerifyEmail}
+                                                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg transition-colors"
+                                            >
+                                                Send Verification Email
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Change Password */}
+                                <div className="space-y-4">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Change Password</label>
+                                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                                        <div className="relative">
+                                            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                            <input 
+                                                type="password" 
+                                                value={newPassword}
+                                                onChange={e => setNewPassword(e.target.value)}
+                                                placeholder="New Password"
+                                                className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-3 text-white text-sm focus:border-cyan-500 outline-none"
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={handleChangePassword}
+                                            className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg transition-colors"
+                                        >
+                                            Update Password
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-slate-800 bg-slate-950 flex justify-end">
-                    <button 
-                        onClick={handleSave}
-                        className="px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg hover:shadow-cyan-500/20"
-                    >
-                        <Save size={18} />
-                        SAVE CONFIGURATION
-                    </button>
-                </div>
+                {activeTab !== 'account' && (
+                    <div className="p-6 border-t border-slate-800 bg-slate-950 flex justify-end">
+                        <button 
+                            onClick={handleSave}
+                            className="px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold rounded-xl flex items-center gap-2 transition-all shadow-lg hover:shadow-cyan-500/20"
+                        >
+                            <Save size={18} />
+                            SAVE CONFIGURATION
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     </div>

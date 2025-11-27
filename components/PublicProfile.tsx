@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PortfolioSettings, AppProject, UserProfile } from '../types';
-import { Globe, Twitter, Github, Award, ExternalLink, Briefcase, Calendar, Linkedin } from 'lucide-react';
+import { Globe, Twitter, Github, Award, ExternalLink, Briefcase, Calendar, Linkedin, Mail, CheckCircle, Coffee, Loader2 } from 'lucide-react';
+import { EmailService, PaymentService } from '../services/platformServices';
 
 interface PublicProfileProps {
   user: UserProfile;
@@ -12,13 +13,32 @@ interface PublicProfileProps {
 export const PublicProfile: React.FC<PublicProfileProps> = ({ user, portfolio, apps }) => {
   const publicApps = apps.filter(app => app.isPublic);
   const totalRevenue = publicApps.reduce((sum, app) => sum + (app.status === 'Live' ? app.mrr : 0), 0);
+  
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [contactLoading, setContactLoading] = useState(false);
 
-  const handleHireClick = () => {
-    if (portfolio.socials?.email) {
-        window.location.href = `mailto:${portfolio.socials.email}?subject=Inquiry from Orca Profile`;
-    } else {
-        alert("This architect hasn't made their email public yet.");
-    }
+  const handleSubscribe = async () => {
+    setSubscribeLoading(true);
+    // Simulate Stripe Connect subscription
+    await PaymentService.subscribeToCreator(user.uid, 5);
+    alert(`You have successfully subscribed to ${portfolio.companyName} for $5/mo!`);
+    setSubscribeLoading(false);
+  };
+
+  const handleContact = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setContactLoading(true);
+      const formData = new FormData(e.target as HTMLFormElement);
+      const msg = formData.get('message') as string;
+      const email = formData.get('email') as string;
+      
+      if (portfolio.socials?.email) {
+         await EmailService.sendContactEmail(portfolio.socials.email, email, msg);
+         alert("Message sent! The architect will be in touch.");
+         setContactModalOpen(false);
+      }
+      setContactLoading(false);
   };
 
   const SocialButton = ({ href, icon }: { href?: string, icon: React.ReactNode }) => {
@@ -45,7 +65,10 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ user, portfolio, a
                 {portfolio.logoEmoji}
             </div>
             <div className="mt-4 text-center">
-                <h1 className="text-3xl font-bold text-white tracking-tight">{portfolio.companyName}</h1>
+                <div className="flex items-center gap-2 justify-center">
+                    <h1 className="text-3xl font-bold text-white tracking-tight">{portfolio.companyName}</h1>
+                    {user.isPro && <CheckCircle size={20} className="text-cyan-500" />}
+                </div>
                 <p className="text-slate-400 font-mono text-sm">@{portfolio.founderName}</p>
             </div>
          </div>
@@ -74,12 +97,23 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ user, portfolio, a
             
             <div className="flex justify-center gap-4 mt-8">
                 <button 
-                    onClick={handleHireClick}
+                    onClick={() => setContactModalOpen(true)}
                     className="px-6 py-2 bg-white text-slate-950 font-bold rounded-full hover:bg-cyan-400 transition-colors flex items-center gap-2"
                 >
                     <Briefcase size={16} /> Hire Me
                 </button>
+
+                <button 
+                    onClick={handleSubscribe}
+                    disabled={subscribeLoading}
+                    className="px-6 py-2 bg-slate-800 border border-slate-700 text-white font-bold rounded-full hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                    {subscribeLoading ? <Loader2 size={16} className="animate-spin" /> : <Coffee size={16} className="text-yellow-500" />}
+                    {subscribeLoading ? 'Processing...' : 'Subscribe ($5/mo)'}
+                </button>
                 
+                <div className="w-px h-8 bg-slate-800 mx-2" />
+
                 <SocialButton href={portfolio.socials?.twitter} icon={<Twitter size={20} />} />
                 <SocialButton href={portfolio.socials?.github} icon={<Github size={20} />} />
                 <SocialButton href={portfolio.socials?.linkedin} icon={<Linkedin size={20} />} />
@@ -141,6 +175,25 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ user, portfolio, a
             </div>
         </div>
       </div>
+
+      {/* Contact Modal */}
+      {contactModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
+              <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-4">Contact {portfolio.founderName}</h3>
+                  <form onSubmit={handleContact} className="space-y-4">
+                      <input name="email" type="email" placeholder="Your Email" required className="w-full p-3 bg-slate-950 border border-slate-800 rounded-lg text-white focus:border-cyan-500 outline-none" />
+                      <textarea name="message" placeholder="How can they help you?" required className="w-full p-3 h-32 bg-slate-950 border border-slate-800 rounded-lg text-white focus:border-cyan-500 outline-none resize-none" />
+                      <div className="flex gap-3">
+                          <button type="button" onClick={() => setContactModalOpen(false)} className="flex-1 py-3 bg-slate-800 text-white rounded-lg">Cancel</button>
+                          <button type="submit" disabled={contactLoading} className="flex-1 py-3 bg-cyan-600 text-white rounded-lg font-bold">
+                              {contactLoading ? 'Sending...' : 'Send Message'}
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

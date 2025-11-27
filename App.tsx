@@ -13,45 +13,78 @@ import { AuthModal } from './components/AuthModal';
 import { EditAppModal } from './components/EditAppModal';
 import { PublicProfile } from './components/PublicProfile';
 import { CommunityHub } from './components/CommunityHub';
-import { INITIAL_APPS, DEFAULT_PORTFOLIO, UNIVERSITY_CURRICULUM } from './constants';
 import { AppProject, ChatMessage, GeneratedAppConcept, AppCategory, PortfolioSettings, CourseNode, UserProfile } from './types';
-import { Plus, GraduationCap, ArrowRight } from 'lucide-react';
+import { AuthService, DatabaseService } from './services/platformServices';
+import { Plus, GraduationCap, ArrowRight, Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
-  // --- State Initialization with Persistence ---
-  const [user, setUser] = useState<UserProfile | null>(() => {
-     const saved = localStorage.getItem('orca_user');
-     return saved ? JSON.parse(saved) : null;
-  });
+  // --- Routing Logic (Hash Router) ---
+  const [publicProfileData, setPublicProfileData] = useState<{user: UserProfile, apps: AppProject[], portfolio: PortfolioSettings} | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
-  const [apps, setApps] = useState<AppProject[]>(() => {
-      const saved = localStorage.getItem('orca_apps');
-      return saved ? JSON.parse(saved) : INITIAL_APPS;
-  });
+  useEffect(() => {
+      const checkHash = async () => {
+          const hash = window.location.hash;
+          if (hash.startsWith('#/p/')) {
+              const username = hash.replace('#/p/', '');
+              setIsLoadingProfile(true);
+              try {
+                  const data = await DatabaseService.getPublicProfile(username);
+                  setPublicProfileData(data);
+              } catch (e) {
+                  console.error("Profile not found");
+              } finally {
+                  setIsLoadingProfile(false);
+              }
+          } else {
+              setPublicProfileData(null);
+          }
+      };
 
-  const [portfolio, setPortfolio] = useState<PortfolioSettings>(() => {
-      const saved = localStorage.getItem('orca_portfolio');
-      return saved ? JSON.parse(saved) : DEFAULT_PORTFOLIO;
-  });
+      window.addEventListener('hashchange', checkHash);
+      checkHash(); // Initial check
+      return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
 
-  const [curriculum, setCurriculum] = useState<CourseNode[]>(() => {
-      const saved = localStorage.getItem('orca_curriculum');
-      return saved ? JSON.parse(saved) : UNIVERSITY_CURRICULUM;
-  });
+
+  // --- Auth State ---
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  // --- Global Auth Listener ---
+  useEffect(() => {
+      const unsubscribe = AuthService.observeUser((currentUser) => {
+          setUser(currentUser);
+          setAuthLoading(false);
+      });
+      return () => unsubscribe();
+  }, []);
+
+  // --- Data State ---
+  const [apps, setApps] = useState<AppProject[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioSettings | null>(null); 
+  const [curriculum, setCurriculum] = useState<CourseNode[]>([]);
   
-  // --- Persistence Effects ---
-  useEffect(() => { 
-    if (user) localStorage.setItem('orca_user', JSON.stringify(user)); 
-    else localStorage.removeItem('orca_user');
+  // --- Load Data on Auth ---
+  useEffect(() => {
+      if (user) {
+          DatabaseService.getApps(user.uid).then(setApps);
+          DatabaseService.getPortfolio(user.uid).then(setPortfolio);
+          DatabaseService.getCurriculum(user.uid).then(setCurriculum);
+      }
   }, [user]);
-  useEffect(() => { localStorage.setItem('orca_apps', JSON.stringify(apps)); }, [apps]);
-  useEffect(() => { localStorage.setItem('orca_portfolio', JSON.stringify(portfolio)); }, [portfolio]);
-  useEffect(() => { localStorage.setItem('orca_curriculum', JSON.stringify(curriculum)); }, [curriculum]);
+
+  // --- Persist Data on Change ---
+  // Optimization: Only save if loaded and changed.
+  // Note: This simple effect saves on every change. In prod, debounce this.
+  useEffect(() => { if (user && apps.length > 0) DatabaseService.saveApps(user.uid, apps); }, [apps, user]);
+  useEffect(() => { if (user && portfolio) DatabaseService.savePortfolio(user.uid, portfolio); }, [portfolio, user]);
+  useEffect(() => { if (user && curriculum.length > 0) DatabaseService.saveCurriculum(user.uid, curriculum); }, [curriculum, user]);
 
 
   // --- UI State ---
   const [viewMode, setViewMode] = useState<'business' | 'public'>('business');
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isLaunchpadOpen, setIsLaunchpadOpen] = useState(false);
   const [isUniversityOpen, setIsUniversityOpen] = useState(false);
   const [isBrandingOpen, setIsBrandingOpen] = useState(false);
@@ -72,23 +105,7 @@ const App: React.FC = () => {
       }, 0);
   }, [apps]);
 
-  // --- Auth Logic ---
-  const handleLogin = (username: string, isPro: boolean) => {
-     // Initialize new user with default rep
-     const newUser: UserProfile = { 
-         username, 
-         isPro, 
-         joinedAt: Date.now(),
-         reputation: 0,
-         title: 'Script Kiddie' 
-    };
-     setUser(newUser);
-     setPortfolio(prev => ({ ...prev, founderName: username }));
-     setIsAuthOpen(false);
-  };
-
   // --- Actions ---
-
   const handleDeployConcept = (concept: GeneratedAppConcept) => {
     const newApp: AppProject = {
       id: `gen-${Date.now()}`,
@@ -132,7 +149,9 @@ const App: React.FC = () => {
     
     // Award massive rep for shipping
     if (user) {
-        setUser({ ...user, reputation: user.reputation + 200 });
+        const updatedUser = { ...user, reputation: user.reputation + 200, shippedApps: (user.shippedApps || 0) + 1 };
+        setUser(updatedUser);
+        DatabaseService.updateUserProfile(user.uid, { reputation: updatedUser.reputation, shippedApps: updatedUser.shippedApps });
     }
 
     setTimeout(() => triggerSystemMessage("First customers incoming! MRR update detected.", 'ai'), 2000);
@@ -150,6 +169,7 @@ const App: React.FC = () => {
   const handleDeleteApp = (appId: string) => {
       if (window.confirm("Are you sure you want to delete this app blueprint?")) {
         setApps(prev => prev.filter(app => app.id !== appId));
+        if (user) DatabaseService.deleteApp(user.uid, appId);
         triggerSystemMessage("🗑️ Blueprint deleted from database.", 'system');
       }
   };
@@ -173,7 +193,9 @@ const App: React.FC = () => {
 
       // Update User Stats
       if (user) {
-          setUser(prev => prev ? ({ ...prev, reputation: prev.reputation + rep }) : null);
+          const updatedUser = { ...user, reputation: user.reputation + rep };
+          setUser(updatedUser);
+          DatabaseService.updateUserProfile(user.uid, { reputation: updatedUser.reputation });
       }
 
       triggerSystemMessage(`🎓 Lesson Completed! +${rep} Reputation Gained.`, 'system');
@@ -194,18 +216,52 @@ const App: React.FC = () => {
     setSystemMessages(prev => [...prev, msg]);
   };
 
-  // --- Render Logic ---
+  // --- RENDER: Public Profile Route ---
+  if (publicProfileData) {
+      return (
+          <>
+             {user && (
+                 <div className="fixed top-4 right-4 z-50 bg-slate-950 rounded-lg p-1 border border-slate-800 shadow-xl">
+                    <button 
+                        onClick={() => window.location.hash = ''}
+                        className="px-4 py-2 bg-cyan-600 text-white font-bold rounded text-sm hover:bg-cyan-500"
+                    >
+                        Return to Dashboard
+                    </button>
+                </div>
+             )}
+             <PublicProfile user={publicProfileData.user} portfolio={publicProfileData.portfolio} apps={publicProfileData.apps} />
+          </>
+      );
+  }
+
+  if (isLoadingProfile) {
+      return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-cyan-500"><Loader2 size={40} className="animate-spin" /></div>;
+  }
+
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-cyan-500"><Loader2 size={40} className="animate-spin" /></div>;
+  }
+
+  // --- RENDER: Dashboard ---
 
   if (!user) {
      return (
         <>
           <LandingPage onLogin={() => setIsAuthOpen(true)} />
-          <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} onLogin={handleLogin} />
+          <AuthModal 
+            isOpen={isAuthOpen} 
+            onClose={() => setIsAuthOpen(false)} 
+            onLogin={() => {}} // Logic handled internally by AuthModal via AuthService
+          />
         </>
      );
   }
 
-  // --- PUBLIC VIEW ---
+  // Wait for portfolio load (only if user exists)
+  if (!portfolio) return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-purple-500"><Loader2 size={40} className="animate-spin" /></div>;
+
+  // --- VIEW: Internal Public Preview ---
   if (viewMode === 'public') {
       return (
           <>
@@ -222,7 +278,7 @@ const App: React.FC = () => {
       );
   }
 
-  // --- BUSINESS VIEW ---
+  // --- VIEW: Main Business Logic ---
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30 overflow-hidden">
       
@@ -361,6 +417,7 @@ const App: React.FC = () => {
         onClose={() => setIsBrandingOpen(false)}
         settings={portfolio}
         apps={apps}
+        user={user}
         onSaveSettings={setPortfolio}
         onToggleVisibility={handleToggleVisibility}
         onUpdateAppCategory={handleUpdateAppCategory}

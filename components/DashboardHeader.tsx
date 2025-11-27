@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { DollarSign, Award, GraduationCap, Users, Eye, Briefcase, Edit2 } from 'lucide-react';
+import { DollarSign, Award, GraduationCap, Users, Eye, Briefcase, Edit2, Share2 } from 'lucide-react';
 import { PortfolioSettings } from '../types';
 
 interface DashboardHeaderProps {
@@ -19,6 +19,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   totalMRR, appCount, reputation, portfolio, viewMode, onToggleView, onOpenUniversity, onOpenBranding, onOpenCommunity 
 }) => {
   const [displayMRR, setDisplayMRR] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   // Animate the number counting up
   useEffect(() => {
@@ -46,6 +47,15 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalMRR]);
 
+  const handleShare = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      // Use hash router format for shareable link
+      const url = `${window.location.origin}/#/p/${portfolio.founderName}`;
+      navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  };
+
   // Calculate Level based on app count and reputation
   const level = Math.floor((appCount * 10 + reputation) / 50) + 1;
   const rank = reputation > 1000 ? "Unicorn" : reputation > 500 ? "Founder" : reputation > 200 ? "Builder" : "Script Kiddie";
@@ -54,34 +64,39 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     <header className="w-full flex flex-col md:flex-row items-center justify-between p-6 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-20 gap-4 md:gap-0">
       
       {/* User Profile / Branding */}
-      <div 
-        className="flex items-center gap-4 w-full md:w-auto justify-start cursor-pointer group p-2 rounded-xl hover:bg-slate-800/50 transition-all border border-transparent hover:border-slate-700 relative" 
-        onClick={onOpenBranding}
-        title="Open Branding Suite"
-      >
-        <div className="relative">
-          <div className="w-12 h-12 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:shadow-[0_0_25px_rgba(34,211,238,0.5)] transition-shadow">
-            {portfolio.logoEmoji}
+      <div className="flex items-center gap-6 w-full md:w-auto">
+          <div 
+            className="flex items-center gap-4 justify-start cursor-pointer group p-2 rounded-xl hover:bg-slate-800/50 transition-all border border-transparent hover:border-slate-700 relative" 
+            onClick={onOpenBranding}
+            title="Open Branding Suite"
+          >
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full bg-slate-800 border-2 border-cyan-500 flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:shadow-[0_0_25px_rgba(34,211,238,0.5)] transition-shadow">
+                {portfolio.logoEmoji}
+              </div>
+              <div className="absolute -bottom-1 -right-1 bg-purple-500 text-white text-[10px] font-bold px-1.5 rounded-full border border-slate-900">
+                Lvl {level}
+              </div>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-100 tracking-tight group-hover:text-cyan-400 transition-colors flex items-center gap-2">
+                  {portfolio.companyName}
+                  <Edit2 size={12} className="opacity-0 group-hover:opacity-100 text-slate-500" />
+              </h1>
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
+                <Award size={12} className="text-yellow-500" />
+                <span>{rank} | Rep: {reputation}</span>
+              </div>
+            </div>
           </div>
-          <div className="absolute -bottom-1 -right-1 bg-purple-500 text-white text-[10px] font-bold px-1.5 rounded-full border border-slate-900">
-            Lvl {level}
-          </div>
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-100 tracking-tight group-hover:text-cyan-400 transition-colors flex items-center gap-2">
-              {portfolio.companyName}
-              <Edit2 size={12} className="opacity-0 group-hover:opacity-100 text-slate-500" />
-          </h1>
-          <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-             <Award size={12} className="text-yellow-500" />
-             <span>{rank} | Rep: {reputation}</span>
-          </div>
-        </div>
-        
-        {/* Tooltip hint */}
-        <div className="absolute left-0 -bottom-8 bg-slate-900 text-slate-300 text-[10px] px-2 py-1 rounded border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-            Manage Public Brand
-        </div>
+
+          <button 
+            onClick={handleShare}
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:border-cyan-500/50 transition-colors"
+          >
+              <Share2 size={14} />
+              {copied ? 'Link Copied!' : 'Share Profile'}
+          </button>
       </div>
 
       {/* View Switcher (Desktop) */}

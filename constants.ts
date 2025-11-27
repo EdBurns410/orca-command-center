@@ -83,8 +83,9 @@ We use **Google AI Studio** (formerly MakerSuite) to build and deploy.
 ### No Local Environment
 Delete Node.js. Delete Git. You don't need them for the V0.1.`,
     tasks: [
-      { id: 't1', text: "Copy this prompt:", codeSnippet: "Create a modern React dashboard for a crypto tracker using Tailwind CSS. Use Lucide icons. Mock data." },
-      { id: 't2', text: "Paste into AI Studio and hit Run." }
+      { id: 't1', text: "Go to https://aistudio.google.com/apps?source=orca" },
+      { id: 't2', text: "Copy this prompt:", codeSnippet: "Create a modern React dashboard for a crypto tracker using Tailwind CSS. Use Lucide icons. Mock data." },
+      { id: 't3', text: "Paste into AI Studio and hit Run." }
     ],
     storyScenarios: [
         {
@@ -119,19 +120,27 @@ Delete Node.js. Delete Git. You don't need them for the V0.1.`,
     content: `### The Deployment Sequence
 Turning a prompt into a URL.
 
-### Step-by-Step
-1.  **Toolbar:** Click the **Rocket Icon** (Deploy) in AI Studio.
-2.  **Project:** Select "Create New Project" (or import existing). Name it relevant to your app.
-3.  **Billing:** If prompted, you MUST link a Billing Account.
-    *   Go to: [Google Cloud Billing](https://console.cloud.google.com/billing/)
-    *   Add a card (Google gives $300 free credit usually).
-    *   Return to AI Studio and refresh.
-4.  **Redeploy:** Click Deploy again. Wait 2-3 minutes.
-5.  **The URL:** You will get a link ending in \`.run.app\`.
-6.  **Ship:** Copy that URL, come back to ORCA, and click "Ship to Prod".`,
+### Step 1: The Rocket
+In the top right of AI Studio, click the **Rocket Icon**. This is your deployment trigger.
+
+### Step 2: Project Setup
+Select **"Create New Project"** or import an existing one. Name it something cool (e.g., "crypto-vibe-tracker").
+
+### Step 3: Billing (The Enterprise Gate)
+Google Cloud Run is a professional tool. You **MUST** link a Billing Account.
+1. Go to [Google Cloud Billing](https://console.cloud.google.com/billing/).
+2. Add a card (Google usually gives $300 free credit).
+3. Return to AI Studio and refresh.
+
+### Step 4: Redeploy & Ship
+1. Click the Rocket Icon again -> **Deploy App**.
+2. Wait 2-3 minutes.
+3. Copy the URL ending in \`.run.app\`.
+4. Paste it into ORCA's **Ship to Prod** terminal.`,
     tasks: [
         { id: 't1', text: "Set up Billing at console.cloud.google.com/billing" },
-        { id: 't2', text: "Deploy App in AI Studio and copy the .run.app URL" }
+        { id: 't2', text: "Deploy App in AI Studio via Rocket Icon" },
+        { id: 't3', text: "Copy the .run.app URL and ship in Orca" }
     ],
     storyScenarios: [
         {
@@ -167,12 +176,12 @@ Turning a prompt into a URL.
 You need to prompt the AI to build a gate.
 
 ### The Prompt Strategy
-Don't write the Stripe integration. Prompt it:
+Don't write the Stripe integration code manually. Prompt it:
 *"Refactor the app to hide the 'Export' feature. Add a 'Upgrade to Pro' button. When clicked, open this Stripe Payment Link: [YOUR_LINK]."*
 
 ### The Logic
-1.  **Create Link:** Go to Stripe Dashboard -> Products -> Create Payment Link.
-2.  **Inject:** Give the URL to Gemini.
+1.  **Create Link:** Go to [Stripe Dashboard](https://dashboard.stripe.com/) -> Products -> Create Payment Link.
+2.  **Inject:** Give the URL to Gemini in your next prompt.
 3.  **Verify:** Ensure the button redirects correctly.`,
     tasks: [
       { id: 't1', text: "Create a Stripe Payment Link" },
@@ -269,13 +278,13 @@ The 5 Modules MUST be exactly this flow:
 - Task 1 CodeSnippet: "Add functionality to [Specific Feature]. When the user clicks X, calculate Y. Save the history to local storage so it persists on refresh."
 
 **Module 4: Monetization (Stripe)**
-- Content: How to gate the value.
-- Task 1 Text: "Create a Stripe Payment Link"
+- Content: How to gate the value using Stripe Payment Links.
+- Task 1 Text: "Create a Stripe Payment Link at dashboard.stripe.com"
 - Task 2 Text: "Copy the Paywall Prompt"
 - Task 2 CodeSnippet: "Add a 'Go Pro' button in the top right. When clicked, open this link: [Insert Your Stripe Link]. Hide the [Premium Feature] until they click it."
 
 **Module 5: Cloud Deployment**
-- Content: The "Ship" phase.
+- Content: The "Ship" phase using Cloud Run.
     1. Click the **Rocket Icon** (Deploy) in AI Studio top right.
     2. Select 'Create New Project' -> Name it '[App Name]'.
     3. If asked, click link to **Cloud Console Billing** and add a card.
